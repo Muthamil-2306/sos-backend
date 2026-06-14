@@ -1,5 +1,5 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');   // switched from bcrypt → bcryptjs
 const bodyParser = require('body-parser');
 const cors = require('cors');
 
@@ -16,6 +16,7 @@ app.post('/register', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).send("Username and password required");
   if (users[username]) return res.status(400).send("User already exists");
+
   const hash = await bcrypt.hash(password, 10);
   users[username] = { password: hash, contacts: [] };
   res.send("Registered successfully");
@@ -26,6 +27,7 @@ app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   const user = users[username];
   if (!user) return res.status(400).send("No user found");
+
   const match = await bcrypt.compare(password, user.password);
   if (match) res.send("Login successful");
   else res.status(400).send("Invalid credentials");
@@ -59,9 +61,9 @@ app.get('/soslogs', (req, res) => {
   res.json(sosLogs);
 });
 
-// Test route (to confirm deployment works)
+// Test route
 app.get('/api/test', (req, res) => {
-  res.send("✅ Backend is running!");
+  res.send("✅ Backend is running with bcryptjs!");
 });
 
 // Use dynamic port for deployment
