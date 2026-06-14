@@ -12,51 +12,58 @@ let users = {};
 let sosLogs = [];
 
 // Registration
-app.post('/register', async (req,res)=>{
-  const {username, password} = req.body;
-  if(!username || !password) return res.status(400).send("Username and password required");
-  if(users[username]) return res.status(400).send("User already exists");
+app.post('/register', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) return res.status(400).send("Username and password required");
+  if (users[username]) return res.status(400).send("User already exists");
   const hash = await bcrypt.hash(password, 10);
-  users[username] = {password: hash, contacts: []};
+  users[username] = { password: hash, contacts: [] };
   res.send("Registered successfully");
 });
 
 // Login
-app.post('/login', async (req,res)=>{
-  const {username, password} = req.body;
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
   const user = users[username];
-  if(!user) return res.status(400).send("No user found");
+  if (!user) return res.status(400).send("No user found");
   const match = await bcrypt.compare(password, user.password);
-  if(match) res.send("Login successful");
+  if (match) res.send("Login successful");
   else res.status(400).send("Invalid credentials");
 });
 
 // Add Contact
-app.post('/contacts', (req,res)=>{
-  const {username, contact} = req.body;
-  if(!users[username]) return res.status(400).send("User not found");
+app.post('/contacts', (req, res) => {
+  const { username, contact } = req.body;
+  if (!users[username]) return res.status(400).send("User not found");
   users[username].contacts.push(contact);
   res.send("Contact added");
 });
 
 // Get Contacts
-app.get('/contacts/:username', (req,res)=>{
+app.get('/contacts/:username', (req, res) => {
   const user = users[req.params.username];
-  if(!user) return res.status(400).send("User not found");
+  if (!user) return res.status(400).send("User not found");
   res.json(user.contacts);
 });
 
 // SOS Alert
-app.post('/sos', (req,res)=>{
-  const {username, location, message} = req.body;
-  sosLogs.push({username, location, message, time:new Date()});
+app.post('/sos', (req, res) => {
+  const { username, location, message } = req.body;
+  sosLogs.push({ username, location, message, time: new Date() });
   console.log(`🚨 SOS from ${username}: ${message} at ${location}`);
   res.send("SOS alert logged");
 });
 
 // Get SOS Logs (optional admin route)
-app.get('/soslogs', (req,res)=>{
+app.get('/soslogs', (req, res) => {
   res.json(sosLogs);
 });
 
-app.listen(3000, ()=>console.log("✅ Backend running on http://localhost:3000"));
+// Test route (to confirm deployment works)
+app.get('/api/test', (req, res) => {
+  res.send("✅ Backend is running!");
+});
+
+// Use dynamic port for deployment
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`✅ Backend running on http://localhost:${PORT}`));
