@@ -1,71 +1,103 @@
-const express = require('express');
-const bcrypt = require('bcryptjs');   // switched from bcrypt → bcryptjs
-const bodyParser = require('body-parser');
-const cors = require('cors');
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
+
+dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
-// In-memory storage (replace with DB later)
-let users = {};
-let sosLogs = [];
+// Supabase connection
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
 
-// Registration
-app.post('/register', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) return res.status(400).send("Username and password required");
-  if (users[username]) return res.status(400).send("User already exists");
-
-  const hash = await bcrypt.hash(password, 10);
-  users[username] = { password: hash, contacts: [] };
-  res.send("Registered successfully");
+// ✅ Test route
+app.get("/api/test", (req, res) => {
+  res.json({ message: "✅ Backend is running with Supabase!" });
 });
 
-// Login
-app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const user = users[username];
-  if (!user) return res.status(400).send("No user found");
+// 🚨 Add SOS alert
+app.post("/api/sos", async (req, res) => {
+  const { user_id, message, location } = req.body;
 
-  const match = await bcrypt.compare(password, user.password);
-  if (match) res.send("Login successful");
-  else res.status(400).send("Invalid credentials");
+  const { data, error } = await supabase
+    .from("alerts")
+    .insert([{ user_id, message, location, timestamp: new Date().toISOString() }])
+    .select();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true, alert: data });
 });
 
-// Add Contact
-app.post('/contacts', (req, res) => {
-  const { username, contact } = req.body;
-  if (!users[username]) return res.status(400).send("User not found");
-  users[username].contacts.push(contact);
-  res.send("Contact added");
+// 📜 Get alerts for a user
+app.get("/api/alerts/:user_id", async (req, res) => {
+  const { user_id } = req.params;
+
+  const { data, error } = await supabase
+    .from("alerts")
+    .select("*")
+    .eq("user_id", user_id)
+    .order("timestamp", { ascending: false });
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
 });
 
-// Get Contacts
-app.get('/contacts/:username', (req, res) => {
-  const user = users[req.params.username];
-  if (!user) return res.status(400).send("User not found");
-  res.json(user.contacts);
+// 👥 Add a contact
+app.post("/api/contacts", async (req, res) => {
+  const { user_id, contact_name, contact_number } = req.body;
+
+  const { data, error } = await supabase
+    .from("contacts")
+    .insert([{ user_id, contact_name, contact_number }])
+    .select();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true, contact: data });
 });
 
-// SOS Alert
-app.post('/sos', (req, res) => {
-  const { username, location, message } = req.body;
-  sosLogs.push({ username, location, message, time: new Date() });
-  console.log(`🚨 SOS from ${username}: ${message} at ${location}`);
-  res.send("SOS alert logged");
+// 📜 Get contacts for a user
+app.get("/api/contacts/:user_id", async (req, res) => {
+  const { user_id } = req.params;
+
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("*")
+    .eq("user_id", user_id);
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
 });
 
-// Get SOS Logs (optional admin route)
-app.get('/soslogs', (req, res) => {
-  res.json(sosLogs);
+// 👤 Register a user
+app.post("/api/users", async (req, res) => {
+  const { name, email, phone, password_hash } = req.body;
+
+  const { data, error } = await supabase
+    .from("users")
+    .insert([{ name, email, phone, password_hash }])
+    .select();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json({ success: true, user: data });
 });
 
-// Test route
-app.get('/api/test', (req, res) => {
-  res.send("✅ Backend is running with bcryptjs!");
+// 📜 Get all users
+app.get("/api/users", async (req, res) => {
+  const { data, error } = await supabase
+    .from("users")
+    .select("*");
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
 });
 
-// Use dynamic port for deployment
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Backend running on http://localhost:${PORT}`));
+// Start server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
